@@ -56,6 +56,18 @@ PUERTO_PUBLICO="${PUERTO_PUBLICO:-443}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-}"
 ADMIN_NOMBRE="${ADMIN_NOMBRE:-Administrador}"
 
+# ── El correo del certificado NO es el del administrador ─────────────
+#
+# `ADMIN_EMAIL` es la persona del ISP que va a entrar al ERP. Los avisos
+# de Let's Encrypt —«su certificado caduca en diez dias»— los quiere
+# normalmente quien OPERA la plataforma, que es otra: si el ERP deja de
+# renovar, el ISP se entera cuando el navegador deja de abrir.
+#
+# Son dos cosas y se deciden por separado, como el telefono de la ficha y
+# el del canal de WhatsApp. Por omision el del ISP, que es mejor que
+# ninguno.
+CERTBOT_EMAIL="${CERTBOT_EMAIL:-$ADMIN_EMAIL}"
+
 if [[ "$PERFIL" == "ecuatek" ]]; then
     REPO_URL="${REPO_URL:-git@github.com:ecuatek/erp-isp.git}"
 else
@@ -746,11 +758,11 @@ sudo -u "$APP_USER" bash "$APP_DIR/deploy/deploy.sh" "${BANDERAS[@]}"
 # emite despues con una linea. Abortar aqui obligaria a repetirlo todo por
 # algo que se arregla en el DNS.
 
-if [[ -n "$ADMIN_EMAIL" ]] && ! certbot certificates 2>/dev/null | grep -q "$APP_DOMAIN"; then
+if [[ -n "$CERTBOT_EMAIL" ]] && ! certbot certificates 2>/dev/null | grep -q "$APP_DOMAIN"; then
     echo "==> Certificado TLS"
-    if certbot --nginx -d "$APP_DOMAIN" -m "$ADMIN_EMAIL" \
+    if certbot --nginx -d "$APP_DOMAIN" -m "$CERTBOT_EMAIL" \
             --agree-tos --non-interactive --redirect >/dev/null 2>&1; then
-        echo "    emitido para ${APP_DOMAIN}"
+        echo "    emitido para ${APP_DOMAIN} (avisos a ${CERTBOT_EMAIL})"
     else
         echo "    no se pudo emitir (el dominio tiene que apuntar aqui y el 80"
         echo "    llegar desde fuera). Cuando lo este:"
