@@ -727,7 +727,12 @@ fi
 # ── El primer despliegue ──────────────────────────────────────────────
 
 echo "==> Primer despliegue"
-sudo -u "$APP_USER" bash "$APP_DIR/deploy/deploy.sh" --primera-vez
+# `ERP_CREARA_ADMIN` le dice al despliegue que no avise de que no hay
+# usuarios: lo va a crear este mismo guion unos pasos mas abajo, y las
+# dos frases juntas se contradicen en la misma pantalla.
+ERP_CREARA_ADMIN="$([[ -n "$ADMIN_EMAIL" ]] && echo 1 || echo 0)" \
+    sudo -u "$APP_USER" --preserve-env=ERP_CREARA_ADMIN \
+    bash "$APP_DIR/deploy/deploy.sh" --primera-vez
 
 # ── El certificado ────────────────────────────────────────────────────
 #
