@@ -9,10 +9,14 @@ curl -fsSL https://raw.githubusercontent.com/ecuatek/erp-isp-instalador/main/ins
 ```
 
 Si este repositorio es **privado**, la instruccion lleva un token de
-lectura, y **dos veces**: la primera la usa el \ para traer este
+lectura, y **dos veces**: la primera la usa el `curl` para traer este
 guion, la segunda es la que el guion necesita para traer los otros dos.
 
-\\\
+```bash
+curl -fsSL -H "Authorization: token <TOKEN>" \
+  https://raw.githubusercontent.com/ecuatek/erp-isp-instalador/main/instalar.sh \
+  | sudo INSTALADOR_TOKEN=<TOKEN> APP_DOMAIN=erp.suisp.com ADMIN_EMAIL=admin@suisp.com bash
+```
 
 Instala y deja funcionando PHP, PostgreSQL, Redis, nginx, Node,
 FreeRADIUS y Docker; despliega el ERP, emite el certificado y crea el
