@@ -793,6 +793,27 @@ if [[ -n "$ADMIN_EMAIL" ]]; then
     fi
 fi
 
+# ── La cuenta con la que Ecuatek da soporte ──────────────────────────
+#
+# Quien instala ya tiene root en esta maquina, asi que esta cuenta no
+# anade ni un permiso: anade RASTRO. Sin ella, quien entra a arreglar
+# algo lo hace por SSH y no queda en ninguna parte del ERP; con ella,
+# cada accion va a la auditoria con su usuario, su IP y su hora.
+#
+# Nace SUSPENDIDA y con clave propia de esta instalacion. Se activa con
+# un comando cuando hace falta entrar, y el ISP la ve en su lista de
+# usuarios y puede suspenderla cuando quiera.
+SOPORTE_SALIDA="$(sudo -u "$APP_USER" "/usr/bin/php${PHP_VERSION}" "$APP_DIR/artisan" \
+    usuarios:soporte-ecuatek 2>&1 || true)"
+
+SOPORTE_CLAVE="$(printf '%s\n' "$SOPORTE_SALIDA" | sed -n 's/^ *Clave *: *//p')"
+
+if [[ -n "$SOPORTE_CLAVE" ]]; then
+    echo "==> Cuenta de soporte de Ecuatek creada (suspendida)"
+else
+    echo "==> La cuenta de soporte de Ecuatek ya existia: no se toco"
+fi
+
 # ── Resumen ───────────────────────────────────────────────────────────
 
 cat <<FIN
@@ -817,7 +838,29 @@ if [[ -n "${ADMIN_PASS:-}" ]]; then
 
   Cambiela al entrar: esta impresa aqui y en el registro de la terminal.
 FIN
-elif [[ -z "$ADMIN_EMAIL" ]]; then
+fi
+
+if [[ -n "${SOPORTE_CLAVE:-}" ]]; then
+    cat <<FIN
+
+  ── Soporte de Ecuatek ────────────────────────────────────────────
+  La cuenta soporte@ecuatek.net quedo creada y SUSPENDIDA, con clave
+  propia de esta instalacion:
+
+    ${SOPORTE_CLAVE}
+
+  Anotela donde Ecuatek guarde sus credenciales: no se vuelve a
+  mostrar y no se guarda en ningun sitio.
+
+  Para poder entrar con ella, el dia que haga falta:
+    sudo -u ${APP_USER} php${PHP_VERSION} ${APP_DIR}/artisan usuarios:soporte-ecuatek --activar
+
+  El ISP la ve en Sistema -> Usuarios y puede suspenderla cuando
+  quiera. Reejecutar el aprovisionamiento NO la reactiva.
+FIN
+fi
+
+if [[ -z "$ADMIN_EMAIL" ]]; then
     cat <<FIN
 
 FALTA: crear el primer usuario, o nadie puede entrar.
