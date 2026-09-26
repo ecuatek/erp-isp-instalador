@@ -233,6 +233,28 @@ install -d -o "$APP_USER" -g "$APP_USER" "$(dirname "$APP_DIR")"
 # hasta que hace falta.
 install -d -o "$APP_USER" -g "$APP_USER" -m 0750 /var/respaldos
 
+# ── Y donde caen los ADJUNTOS ─────────────────────────────────────────
+#
+# El disco `adjuntos` del ERP apunta a `/data_erp/adjuntos`, y **no lo
+# creaba nadie**. Ese disco lleva `'throw' => false`, asi que
+# `Storage::put()` devuelve FALSO en vez de fallar (trampa 24): la
+# primera foto que un tecnico suba desde el domicilio del cliente se
+# pierde sin un solo error, y el ERP guarda la fila que la nombra.
+#
+# Se descubre semanas despues, abriendo una orden vieja para un reclamo.
+#
+# Va aqui por lo mismo que los respaldos: crearlo sobre la marcha lo
+# dejaria con el dueño de quien escriba primero —la trampa 23— y ademas
+# ni eso funciona, porque `/data_erp` es de root y el proceso web no
+# puede crear dentro.
+#
+# **Es un punto de montaje en potencia**, y el mas probable de los dos:
+# con 20.000 instalaciones son decenas de GB de fotos. Un ISP que monte
+# un disco aparte lo hace aqui, y entonces el dueño lo decide el montaje,
+# asi que se corrige aunque el directorio ya exista.
+install -d -o "$APP_USER" -g "$APP_USER" -m 0750 /data_erp
+install -d -o "$APP_USER" -g "$APP_USER" -m 0750 /data_erp/adjuntos
+
 # ── Base de datos ─────────────────────────────────────────────────────
 
 echo "==> Base de datos ${DB_NAME}"
