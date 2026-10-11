@@ -452,49 +452,38 @@ echo "==> nginx"
 # corregirlo por las bravas: con un ERP en marcha, cambiar el
 # `server_name` es una decision, no un efecto lateral de volver a correr
 # el instalador.
-# ── Que nginx anote al VISITANTE y no al proxy ───────────────────────
+# ── Lo que NO se hace: el `real_ip` de nginx ─────────────────────────
 #
-# ── Por que en su propio archivo y no dentro del vhost ─────────────
-# Porque el vhost **se escribe una sola vez** a proposito: dentro puede
-# estar la configuracion TLS que puso certbot, y reescribirlo la borra
-# dejando el ERP inalcanzable sin un error (es el bloque de abajo).
+# Seria lo natural para que el registro de accesos anote al visitante y no
+# al proxy, y se intento. **Rompe la aplicacion**, y asi:
 #
-# Metido ahi, este ajuste solo habria valido en una instalacion NUEVA:
-# quien moviera un ERP ya instalado detras de un proxy pasaria el
-# parametro, el guion contestaria «ya configurado, no se toca» y nginx
-# seguiria anotando el proxy. Un interruptor que no hace nada es peor que
-# no tenerlo, porque quien lo ve puesto deja de buscar.
+#   `set_real_ip_from` + `real_ip_header X-Forwarded-For` reescriben
+#   `REMOTE_ADDR` con la IP del CLIENTE antes de que PHP la vea. Entonces
+#   la lista de confianza de Laravel —que espera ver la IP del PROXY— ya
+#   no casa nunca, asi que **deja de creerse el `X-Forwarded-Proto`**: la
+#   peticion se considera `http`, y los recursos de Vite salen con
+#   `http://` en una pagina servida por `https`. El navegador bloquea el
+#   contenido mixto, el JavaScript no carga, y con Inertia eso es una
+#   **pagina en blanco**. Medido en ALTA-META el 11/10/2026: sin el
+#   archivo los recursos salen `https`, con el archivo salen `http`.
 #
-# `real_ip` tambien vale a nivel `http`, y `conf.d/` lo incluye nginx por
-# omision, asi que aqui se puede reescribir en cada pasada sin tocar nada
-# ajeno.
+# Y no hacia falta: **Laravel ya da la IP real del visitante**, porque lee
+# `X-Forwarded-For` precisamente cuando `REMOTE_ADDR` es el proxy y casa
+# con `TRUSTED_PROXIES`. Lo unico que el `real_ip` mejoraba era la linea
+# del registro de nginx. Cambiar eso por una aplicacion que no arranca no
+# es una mejora.
 #
-# `real_ip_recursive` recorre `X-Forwarded-For` de derecha a izquierda
-# saltandose las IP de confianza: con dos proxies encadenados, sin ella se
-# anota el ultimo salto en vez del cliente.
+# Dos mecanismos correctos para el mismo problema se anulan — la trampa 49
+# con otra cara: ahi eran dos optimizaciones que juntas abrian un agujero,
+# aqui son dos formas de saber quien llama que juntas no saben ninguna.
 PROXY_CONF="/etc/nginx/conf.d/erp-isp-proxy.conf"
 
-if [[ -n "$PROXY_DELANTE" ]]; then
-    {
-        echo "# Lo escribe provision.sh. No editar a mano: se reescribe."
-        IFS=',' read -ra _PROXIES <<< "$PROXY_DELANTE"
-        for _p in "${_PROXIES[@]}"; do
-            _p="$(echo "$_p" | tr -d '[:space:]')"
-            [[ -n "$_p" ]] && echo "set_real_ip_from ${_p};"
-        done
-        echo "real_ip_header X-Forwarded-For;"
-        echo "real_ip_recursive on;"
-    } > "$PROXY_CONF"
-
-    echo "    nginx confia en ${PROXY_DELANTE} para leer X-Forwarded-For"
-
-elif [[ -f "$PROXY_CONF" ]]; then
-    # Y si ya no hay proxy, se QUITA. Dejarlo haria que nginx siguiera
-    # creyendole la cabecera a una IP que ya no es el proxy, y entonces
-    # cualquiera puede decir que viene de donde quiera: el tope por IP del
-    # login deja de proteger y el registro miente.
+if [[ -f "$PROXY_CONF" ]]; then
+    # Se BORRA, no se deja: una instalacion que recibio la version con
+    # `real_ip` se quedaria con la pagina en blanco para siempre, y el
+    # sintoma no apunta a un archivo que nadie recuerda haber puesto.
     rm -f "$PROXY_CONF"
-    echo "    ya no hay proxy delante: ${PROXY_CONF} eliminado"
+    echo "    ${PROXY_CONF} eliminado: rompia el esquema de las URL"
 fi
 
 SITIO="/etc/nginx/sites-available/erp-isp"
