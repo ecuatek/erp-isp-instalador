@@ -3,7 +3,7 @@
 # ERP-ISP · Instalador
 #
 #   curl -fsSL https://raw.githubusercontent.com/ecuatek/erp-isp-instalador/main/instalar.sh \
-#     | sudo APP_DOMAIN=erp.miisp.com ADMIN_EMAIL=admin@miisp.com bash
+#     | sudo APP_DOMAIN=<dominio> ADMIN_EMAIL=<correo> bash
 #
 # Trae el aprovisionamiento y lo ejecuta. Nada mas: todo lo que hace de
 # verdad esta en `provision.sh`, y este guion existe solo para que ese

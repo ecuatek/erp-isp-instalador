@@ -5,7 +5,7 @@ dominio ya apuntando a la maquina:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ecuatek/erp-isp-instalador/main/instalar.sh \
-  | sudo APP_DOMAIN=erp.suisp.com ADMIN_EMAIL=admin@suisp.com bash
+  | sudo APP_DOMAIN=<dominio> ADMIN_EMAIL=<correo> bash
 ```
 
 Si este repositorio es **privado**, la instruccion lleva un token de
@@ -15,7 +15,7 @@ guion, la segunda es la que el guion necesita para traer los otros dos.
 ```bash
 curl -fsSL -H "Authorization: token <TOKEN>" \
   https://raw.githubusercontent.com/ecuatek/erp-isp-instalador/main/instalar.sh \
-  | sudo INSTALADOR_TOKEN=<TOKEN> APP_DOMAIN=erp.suisp.com ADMIN_EMAIL=admin@suisp.com bash
+  | sudo INSTALADOR_TOKEN=<TOKEN> APP_DOMAIN=<dominio> ADMIN_EMAIL=<correo> bash
 ```
 
 Instala y deja funcionando PHP, PostgreSQL, Redis, nginx, Node,
