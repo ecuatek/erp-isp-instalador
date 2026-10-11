@@ -68,6 +68,39 @@ ADMIN_NOMBRE="${ADMIN_NOMBRE:-Administrador}"
 # ninguno.
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-$ADMIN_EMAIL}"
 
+# ── Y si hay un proxy inverso delante ────────────────────────────────
+#
+# Las IP del proxy que termina el TLS y reenvia por HTTP, separadas por
+# comas. Vacio —lo normal— significa que esta maquina habla directo con
+# internet y nada de lo de abajo cambia.
+#
+# ── Por que UN parametro y no tres ─────────────────────────────────
+# Porque «hay un proxy delante» no es una preferencia: es una forma de
+# despliegue, y cambia tres cosas a la vez que antes habia que acertar
+# por separado:
+#
+#   - **certbot no puede emitir** desde aqui: el 80 no llega a esta
+#     maquina, llega al proxy. Se intentaba igual y fallaba.
+#   - **`TRUSTED_PROXIES` tiene que llevar su IP**, o todas las
+#     peticiones parecen venir de el y el tope por IP del login y del
+#     endpoint de licencia castiga a todos los ISP a la vez.
+#   - **nginx tiene que creerse `X-Forwarded-For`**, o su registro anota
+#     el proxy en vez del visitante y deja de servir para diagnosticar.
+#
+# Las tres se olvidan por separado y ninguna falla de forma visible, que
+# es exactamente la clase de hueco que un parametro cierra y tres no.
+PROXY_DELANTE="${PROXY_DELANTE:-}"
+
+# El TLS lo pone el proxy, asi que certbot aqui no tiene nada que hacer.
+#
+# Se fuerza en vez de dejarlo a quien ejecuta porque `${CERTBOT_EMAIL:-...}`
+# cae al correo del administrador tambien con la cadena VACIA —`:-` no
+# distingue «sin definir» de «definido en vacio»—, asi que pedir el
+# administrador y saltar certbot era imposible de expresar.
+if [[ -n "$PROXY_DELANTE" ]]; then
+    CERTBOT_EMAIL=""
+fi
+
 if [[ "$PERFIL" == "ecuatek" ]]; then
     REPO_URL="${REPO_URL:-git@github.com:ecuatek/erp-isp.git}"
 else
@@ -419,6 +452,51 @@ echo "==> nginx"
 # corregirlo por las bravas: con un ERP en marcha, cambiar el
 # `server_name` es una decision, no un efecto lateral de volver a correr
 # el instalador.
+# ── Que nginx anote al VISITANTE y no al proxy ───────────────────────
+#
+# ── Por que en su propio archivo y no dentro del vhost ─────────────
+# Porque el vhost **se escribe una sola vez** a proposito: dentro puede
+# estar la configuracion TLS que puso certbot, y reescribirlo la borra
+# dejando el ERP inalcanzable sin un error (es el bloque de abajo).
+#
+# Metido ahi, este ajuste solo habria valido en una instalacion NUEVA:
+# quien moviera un ERP ya instalado detras de un proxy pasaria el
+# parametro, el guion contestaria «ya configurado, no se toca» y nginx
+# seguiria anotando el proxy. Un interruptor que no hace nada es peor que
+# no tenerlo, porque quien lo ve puesto deja de buscar.
+#
+# `real_ip` tambien vale a nivel `http`, y `conf.d/` lo incluye nginx por
+# omision, asi que aqui se puede reescribir en cada pasada sin tocar nada
+# ajeno.
+#
+# `real_ip_recursive` recorre `X-Forwarded-For` de derecha a izquierda
+# saltandose las IP de confianza: con dos proxies encadenados, sin ella se
+# anota el ultimo salto en vez del cliente.
+PROXY_CONF="/etc/nginx/conf.d/erp-isp-proxy.conf"
+
+if [[ -n "$PROXY_DELANTE" ]]; then
+    {
+        echo "# Lo escribe provision.sh. No editar a mano: se reescribe."
+        IFS=',' read -ra _PROXIES <<< "$PROXY_DELANTE"
+        for _p in "${_PROXIES[@]}"; do
+            _p="$(echo "$_p" | tr -d '[:space:]')"
+            [[ -n "$_p" ]] && echo "set_real_ip_from ${_p};"
+        done
+        echo "real_ip_header X-Forwarded-For;"
+        echo "real_ip_recursive on;"
+    } > "$PROXY_CONF"
+
+    echo "    nginx confia en ${PROXY_DELANTE} para leer X-Forwarded-For"
+
+elif [[ -f "$PROXY_CONF" ]]; then
+    # Y si ya no hay proxy, se QUITA. Dejarlo haria que nginx siguiera
+    # creyendole la cabecera a una IP que ya no es el proxy, y entonces
+    # cualquiera puede decir que viene de donde quiera: el tope por IP del
+    # login deja de proteger y el registro miente.
+    rm -f "$PROXY_CONF"
+    echo "    ya no hay proxy delante: ${PROXY_CONF} eliminado"
+fi
+
 SITIO="/etc/nginx/sites-available/erp-isp"
 
 if [[ -f "$SITIO" ]]; then
@@ -730,7 +808,7 @@ if [[ ! -f "$APP_DIR/.env" ]]; then
     # —y cada uno la rompe de una forma distinta.
     EJEMPLO="$APP_DIR/.env.example" DESTINO="$APP_DIR/.env" \
     V_APP_URL="$APP_URL" V_DB_NAME="$DB_NAME" V_DB_USER="$DB_USER" \
-    V_DB_PASS="$DB_PASS" V_DB_PORT="$DB_PUERTO" python3 <<'PY'
+    V_DB_PASS="$DB_PASS" V_DB_PORT="$DB_PUERTO" V_PROXIES="$PROXY_DELANTE" python3 <<'PY'
 import os, pathlib, re
 
 texto = pathlib.Path(os.environ['EJEMPLO']).read_text()
@@ -744,11 +822,26 @@ valores = {
     'DB_PASSWORD': os.environ['V_DB_PASS'],
 }
 
+# Con un proxy delante hay que decirle al ERP en quien confiar, o todas
+# las peticiones parecen venir de el: el tope por IP del login y del
+# endpoint de licencia castigaria a todos los ISP a la vez.
+if os.environ.get('V_PROXIES'):
+    valores['TRUSTED_PROXIES'] = os.environ['V_PROXIES']
+
 for clave, valor in valores.items():
     # Entre comillas SIEMPRE: una contraseña puede llevar un `#`, y a
     # partir de ahi Laravel lee el resto de la linea como comentario —o
     # sea, media contraseña, sin que nada falle al arrancar.
-    texto = re.sub(rf'(?m)^{clave}=.*$', f'{clave}="{valor}"', texto)
+    #
+    # Y se comprueba el EFECTO, no que `re.sub` no fallara: sobre una
+    # clave que no esta en `.env.example` no sustituye nada y devuelve el
+    # texto igual, **sin error**. El ERP arrancaria con ese ajuste sin
+    # poner, y el sintoma saldria lejos — el dia que alguien se pregunte
+    # por que el ERP no confia en su proxy.
+    texto, cuantas = re.subn(rf'(?m)^{clave}=.*$', f'{clave}="{valor}"', texto)
+
+    if cuantas == 0:
+        texto = texto.rstrip('\n') + f'\n{clave}="{valor}"\n'
 
 pathlib.Path(os.environ['DESTINO']).write_text(texto)
 PY

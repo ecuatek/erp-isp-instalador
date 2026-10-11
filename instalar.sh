@@ -35,6 +35,11 @@
 #   PUERTO_PUBLICO   el puerto publico, si hay NAT      (por omision 443)
 #   ADMIN_EMAIL      correo del primer administrador y del certificado
 #   PERFIL           `isp` (por omision) o `ecuatek`
+#   PROXY_DELANTE    IP del proxy inverso que termina el TLS, si hay uno.
+#                    Con esto, certbot no se intenta —el 80 llega al
+#                    proxy, no aqui—, el ERP confia en esa IP para leer
+#                    `X-Forwarded-For`, y nginx anota al visitante en vez
+#                    del proxy. Vacio es el caso normal.
 
 set -euo pipefail
 
