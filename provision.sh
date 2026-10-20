@@ -211,9 +211,10 @@ apt-get update -qq
 # ── Instalacion ───────────────────────────────────────────────────────
 
 echo "==> PHP ${PHP_VERSION} y extensiones"
-# pgsql: la base. redis: cache y colas. bcmath: importes sin errores de
-# redondeo. gd: imagenes de los adjuntos del chat. soap y xml: haran falta
-# para la facturacion electronica del SRI.
+# pgsql: la base. redis: cache y colas. gd: los adjuntos del chat y el
+# icono de la app. zip: el extracto del banco, que llega en .xlsx. xml: los
+# comprobantes del SRI. bcmath e intl no las usa nadie hoy; se dejan porque
+# son dos megas y quitarlas solo se nota el dia que algo las necesite.
 #
 # snmp: con lo que el ERP lee los equipos de red y las potencias opticas de
 # las OLT. **Faltaba**, y sin ella no se puede preguntar nada: el monitoreo
@@ -221,11 +222,23 @@ echo "==> PHP ${PHP_VERSION} y extensiones"
 # el BRAS contestando al ping a 0,4 ms. Le paso a TELECOMTV el 20/10/2026 y
 # aqui no se veia porque en erpradius estaba puesta a mano — la peor forma
 # de un defecto, funciona donde se prueba.
+#
+# **soap NO se instala**, y no es un olvido: el ERP habla con el SRI con un
+# POST y un sobre escrito a mano, a proposito —lo explica
+# `EnvioSriService`—, porque exigir una extension es exigir que cincuenta
+# administradores distintos la instalen y la conserven en cada
+# actualizacion. Se instalaba en cada ISP para nada.
+#
+# Lo que el ERP necesita y aqui tiene que estar lo dice
+# `App\Support\RequisitosDelSistema`, y hay una prueba que falla si esta
+# lista y esa se contradicen. Las extensiones sin las que ni arranca van
+# ademas en `composer.json`: ahi las comprueba `composer install`, que es
+# antes y mas fuerte —la instalacion se para nombrando la que falta—.
 apt-get install -y -qq \
     php${PHP_VERSION}-cli php${PHP_VERSION}-fpm php${PHP_VERSION}-pgsql \
     php${PHP_VERSION}-redis php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
     php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-gd \
-    php${PHP_VERSION}-bcmath php${PHP_VERSION}-intl php${PHP_VERSION}-soap \
+    php${PHP_VERSION}-bcmath php${PHP_VERSION}-intl \
     php${PHP_VERSION}-snmp php${PHP_VERSION}-opcache
 
 echo "==> PostgreSQL ${PG_VERSION}"
