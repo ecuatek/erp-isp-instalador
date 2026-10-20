@@ -213,8 +213,18 @@ apt-get update -qq
 echo "==> PHP ${PHP_VERSION} y extensiones"
 # pgsql: la base. redis: cache y colas. gd: los adjuntos del chat y el
 # icono de la app. zip: el extracto del banco, que llega en .xlsx. xml: los
-# comprobantes del SRI. bcmath e intl no las usa nadie hoy; se dejan porque
-# son dos megas y quitarlas solo se nota el dia que algo las necesite.
+# comprobantes del SRI.
+#
+# bcmath la usa `brick/math` —que viene con el framework y con
+# `ramsey/uuid`— cuando esta: sin ella cae a su calculadora en PHP puro, que
+# hace lo mismo mas despacio. No la nombra ningun `require`, asi que no es
+# obligatoria; se instala porque es un acelerador real y cuesta dos megas.
+#
+# **intl NO se instala**: no la usa nada. La necesitarian
+# `Illuminate\Support\Number` y los mensajes ICU de symfony/translation, y
+# el ERP no usa ninguno de los dos —las traducciones son arrays de PHP—. El
+# dia que haga falta, el error la nombra y se declara en
+# `RequisitosDelSistema`.
 #
 # snmp: con lo que el ERP lee los equipos de red y las potencias opticas de
 # las OLT. **Faltaba**, y sin ella no se puede preguntar nada: el monitoreo
@@ -238,8 +248,8 @@ apt-get install -y -qq \
     php${PHP_VERSION}-cli php${PHP_VERSION}-fpm php${PHP_VERSION}-pgsql \
     php${PHP_VERSION}-redis php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
     php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-gd \
-    php${PHP_VERSION}-bcmath php${PHP_VERSION}-intl \
-    php${PHP_VERSION}-snmp php${PHP_VERSION}-opcache
+    php${PHP_VERSION}-bcmath php${PHP_VERSION}-snmp \
+    php${PHP_VERSION}-opcache
 
 echo "==> PostgreSQL ${PG_VERSION}"
 apt-get install -y -qq postgresql-${PG_VERSION} postgresql-client-${PG_VERSION}
