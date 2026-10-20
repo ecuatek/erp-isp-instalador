@@ -867,58 +867,29 @@ fi
 
 # ── Reverb: lo que el NAVEGADOR tiene que marcar ─────────────────────
 #
-# `REVERB_SERVER_*` es donde escucha Reverb (127.0.0.1:8090, que es a donde
-# nginx pasa `/app`). `REVERB_HOST/PORT/SCHEME` es otra cosa: **la
-# direccion que el navegador del operador marca**, y el `.env.example` la
-# trae como `erp.ejemplo.com` con un «CAMBIAR» al lado que nadie cambia.
+# El `.env.example` trae `REVERB_HOST=erp.ejemplo.com` con un «CAMBIAR» al
+# lado que nadie cambia, y las tres credenciales vacias. Con eso el chat
+# **en vivo** no conecta nunca: el ERP funciona, el chat funciona, y lo
+# unico que no va es que un mensaje nuevo aparezca sin recargar — que es
+# justo para lo que existe la bandeja, porque sin eso dos personas le
+# escriben al mismo cliente. El unico rastro es un error en la consola del
+# navegador que nadie mira. Lo encontro Jerson el 14/10/2026 buscando otra
+# cosa.
 #
-# ── Por que esto no se nota y duele ─────────────────────────────────
-# Los valores `VITE_*` se **hornean dentro del JavaScript** al compilar, asi
-# que el bundle de cada instalacion nueva marcaba `erp.ejemplo.com` y el
-# WebSocket no conectaba NUNCA. El ERP funciona, el chat funciona, y lo
-# unico que no va es lo de EN VIVO: un mensaje nuevo no aparece hasta que
-# el agente recarga — que es justo para lo que existe la bandeja, porque
-# sin eso dos personas le escriben al mismo cliente.
+# ── Y por que ya no esta escrito aqui ───────────────────────────────
+# Porque esto corre UNA sola vez. La instalacion de TELECOMTV es de
+# septiembre, asi que este bloque no lo ejecuto nunca y su chat en vivo
+# siguio mudo hasta el 20/10/2026 — con el arreglo escrito y publicado
+# desde hacia una semana. Lo mismo que paso con los paquetes del sistema.
 #
-# El unico rastro es un error en la consola del navegador que nadie mira.
-# Lo encontro Jerson el 14/10/2026 buscando otra cosa.
+# Ahora vive en `configurar-reverb.sh` y lo llama tambien `deploy.sh`, que
+# es lo unico que alcanza a una instalacion que ya existe. Se le pasan el
+# dominio y el puerto porque aqui se saben; suelto, los saca de `APP_URL`.
 #
-# Y las TRES credenciales venian vacias, con el servicio instalado,
-# habilitado y corriendo: el patron de siempre — un interruptor puesto y
-# una funcion muerta.
-REVERB_ENV="$APP_DIR/.env"
-
-if [[ -f "$REVERB_ENV" ]]; then
-    # Las credenciales se generan UNA vez y no se tocan: rotarlas deja el
-    # chat mudo hasta el siguiente `npm run build`, porque la clave tambien
-    # va horneada en el JavaScript.
-    for CLAVE in REVERB_APP_ID REVERB_APP_KEY REVERB_APP_SECRET; do
-        ACTUAL="$(sed -n "s/^${CLAVE}=\s*\([^ #]*\).*/\1/p" "$REVERB_ENV" | head -1)"
-
-        if [[ -z "$ACTUAL" ]]; then
-            if [[ "$CLAVE" == "REVERB_APP_ID" ]]; then
-                VALOR="$(shuf -i 100000-999999 -n 1)"
-            else
-                VALOR="$(openssl rand -hex 16)"
-            fi
-
-            sed -i "s|^${CLAVE}=.*|${CLAVE}=${VALOR}|" "$REVERB_ENV"
-            echo "    ${CLAVE} generado"
-        fi
-    done
-
-    # El host SI se corrige si quedo en el del ejemplo o vacio: `APP_DOMAIN`
-    # es por donde se entra, y eso es exactamente lo que el navegador tiene
-    # que marcar. Lo que alguien haya puesto a proposito no se pisa.
-    HOST_ACTUAL="$(sed -n 's/^REVERB_HOST=\s*\([^ #]*\).*/\1/p' "$REVERB_ENV" | head -1)"
-
-    if [[ -z "$HOST_ACTUAL" || "$HOST_ACTUAL" == "erp.ejemplo.com" ]]; then
-        sed -i "s|^REVERB_HOST=.*|REVERB_HOST=${APP_DOMAIN}|" "$REVERB_ENV"
-        sed -i "s|^REVERB_PORT=.*|REVERB_PORT=${PUERTO_PUBLICO}|" "$REVERB_ENV"
-        sed -i "s|^REVERB_SCHEME=.*|REVERB_SCHEME=https|" "$REVERB_ENV"
-        echo "    Reverb apunta al navegador a ${APP_DOMAIN}:${PUERTO_PUBLICO}"
-    fi
-fi
+# Desde `$APP_DIR` y no desde el directorio de este guion: quien instala
+# por primera vez copia el instalador a una maquina limpia, y este guion
+# es el que clona el repositorio donde ese archivo vive.
+bash "$APP_DIR/deploy/configurar-reverb.sh" "$APP_DIR/.env" "$APP_DOMAIN" "$PUERTO_PUBLICO"
 
 
 # ── El primer despliegue ──────────────────────────────────────────────
