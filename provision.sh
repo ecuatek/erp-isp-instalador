@@ -214,18 +214,30 @@ echo "==> PHP ${PHP_VERSION} y extensiones"
 # pgsql: la base. redis: cache y colas. bcmath: importes sin errores de
 # redondeo. gd: imagenes de los adjuntos del chat. soap y xml: haran falta
 # para la facturacion electronica del SRI.
+#
+# snmp: con lo que el ERP lee los equipos de red y las potencias opticas de
+# las OLT. **Faltaba**, y sin ella no se puede preguntar nada: el monitoreo
+# decia «el equipo no responde por SNMP» en toda instalacion correcta, con
+# el BRAS contestando al ping a 0,4 ms. Le paso a TELECOMTV el 20/10/2026 y
+# aqui no se veia porque en erpradius estaba puesta a mano — la peor forma
+# de un defecto, funciona donde se prueba.
 apt-get install -y -qq \
     php${PHP_VERSION}-cli php${PHP_VERSION}-fpm php${PHP_VERSION}-pgsql \
     php${PHP_VERSION}-redis php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
     php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-gd \
     php${PHP_VERSION}-bcmath php${PHP_VERSION}-intl php${PHP_VERSION}-soap \
-    php${PHP_VERSION}-opcache
+    php${PHP_VERSION}-snmp php${PHP_VERSION}-opcache
 
 echo "==> PostgreSQL ${PG_VERSION}"
 apt-get install -y -qq postgresql-${PG_VERSION} postgresql-client-${PG_VERSION}
 
 echo "==> Redis, nginx, Node, FreeRADIUS, Docker"
-apt-get install -y -qq redis-server nginx nodejs \
+# `snmp` son las herramientas de consola (`snmpwalk`, `snmpget`). El ERP no
+# las usa —lee con la extension de PHP— y se instalan igual: cuando un
+# equipo no contesta, lo primero que hace quien lo revisa es preguntarle
+# desde el servidor, y no tenerlas convierte un diagnostico de un minuto en
+# «instale esto antes de poder mirar».
+apt-get install -y -qq redis-server nginx nodejs snmp \
     freeradius freeradius-postgresql freeradius-utils \
     docker-ce docker-ce-cli containerd.io docker-compose-plugin \
     certbot python3-certbot-nginx
