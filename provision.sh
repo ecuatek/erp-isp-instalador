@@ -162,6 +162,35 @@ fi
 RAM_MB="$(free -m | awk '/^Mem:/{print $2}')"
 echo "==> Memoria detectada: ${RAM_MB} MB"
 
+# ── La hora de la maquina ─────────────────────────────────────────────
+#
+# Esto NO se hacia, asi que cada instalacion se quedaba con la zona de la
+# imagen del proveedor —UTC en casi todas— mientras el ERP corre en la de
+# `APP_TIMEZONE`. Aqui no se noto porque la maquina de build la tiene
+# puesta a mano: el defecto que funciona donde se prueba.
+#
+# Y no es cosmetico. Hay columnas que escribe **PostgreSQL** y no el ERP,
+# con `DEFAULT now()`: `radpostauth.authdate` —una fila por
+# autenticacion—, `auditoria.ocurrido_en` y `user_fixed_ip.updated_at`.
+# Con la base en otra zona esas filas nacen con un reloj y las del ERP con
+# otro, en la misma tabla y sin que nada falle: los rechazos quedan cinco
+# horas en el futuro y las ventanas que los buscan miran donde no es.
+#
+# ── Va ANTES de instalar PostgreSQL, y eso no es casual ──────────────
+#
+# `initdb` copia la zona del sistema a `postgresql.conf` el dia que crea
+# el cluster, y despues **no vuelve a mirarla**: cambiarla mas tarde deja
+# la base donde estaba. Puesto aqui, el cluster nace con la buena y hay un
+# solo sitio que la decide.
+#
+# El valor por omision es el mismo de `.env.example`, y hay una prueba que
+# falla si los dos dejan de coincidir: dos defectos del mismo dato acaban
+# discrepando, y el que se quede atras es el que nadie mira.
+ZONA_HORARIA="${ZONA_HORARIA:-America/Guayaquil}"
+
+echo "==> Zona horaria: ${ZONA_HORARIA}"
+timedatectl set-timezone "$ZONA_HORARIA"
+
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Repositorios ──────────────────────────────────────────────────────
