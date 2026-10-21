@@ -16,6 +16,40 @@
 
 set -euo pipefail
 
+# ── Pararse no es tener que empezar de cero ──────────────────────────
+#
+# Con `set -e`, cualquier tropiezo mata el guion dejando en pantalla el
+# error de quien fallara —casi siempre `apt`— y nada mas. Quien lo ve no
+# tiene forma de saber que **este guion se puede repetir**: cada paso
+# comprueba si ya esta hecho y continua desde donde se quedo.
+#
+# Sin decirlo, lo razonable es suponer lo contrario —que hay que deshacer
+# algo, o reinstalar la maquina— y eso convierte un repositorio con un
+# mal minuto en una instalacion abandonada.
+#
+# `exit` NO dispara ERR, asi que la unica parada legitima del instalador
+# —la de autorizar la llave de despliegue, que ya explica que hacer— no
+# imprime esto encima.
+al_fallar() {
+    local CODIGO=$?
+
+    cat >&2 <<AVISO
+
+════════════════════════════════════════════════════════════════════
+El aprovisionamiento se detuvo (codigo ${CODIGO}).
+
+Vuelva a ejecutar ESTE MISMO guion: cada paso comprueba si ya
+esta hecho y continua desde donde se quedo. No hay que deshacer
+nada ni reinstalar la maquina.
+
+Si el error de arriba habla de descargar paquetes —503, timeout,
+«Unable to fetch»— fue el repositorio y no esta maquina: espere
+un minuto y repita.
+════════════════════════════════════════════════════════════════════
+AVISO
+}
+trap al_fallar ERR
+
 # ── Parametros ────────────────────────────────────────────────────────
 # Lo unico que hay que ajustar antes de ejecutar.
 
@@ -197,6 +231,28 @@ export DEBIAN_FRONTEND=noninteractive
 # Las versiones que trae Ubuntu por defecto no siempre son las que este
 # proyecto necesita, y cambiar de version mayor despues es mucho mas caro
 # que agregar un repositorio ahora.
+
+# ── Un repositorio que tropieza no deja la maquina a medias ──────────
+#
+# `apt-get` **no reintenta por omision**: un 503 de un espejo —o del PPA
+# de PHP, que es el que mas se cae— aborta la instalacion entera con un
+# mensaje que parece un fallo del instalador. Y aqui eso no es un
+# contratiempo menor: el ISP se queda con media maquina aprovisionada y
+# sin saber si puede volver a ejecutar (puede: cada paso comprueba si ya
+# esta hecho, pero eso no lo sabe quien acaba de ver un error en rojo).
+#
+# Lo encontro el ensayo en maquina limpia la primera vez que corrio:
+# `503 Service Unavailable` en `php8.3-cli` y `php8.3-igbinary`. Medido
+# ese dia contra el PPA desde fuera del contenedor: **una de cada tres
+# peticiones fallaba**, asi que con treinta paquetes por bajar lo raro
+# habria sido que saliera bien.
+#
+# Va como configuracion de apt y no como bandera en cada llamada: hay
+# cinco `apt-get install` repartidos por el guion y el sexto que alguien
+# añada se olvidaria.
+cat > /etc/apt/apt.conf.d/80-erp-isp-reintentos <<'REINTENTOS'
+Acquire::Retries "5";
+REINTENTOS
 
 echo "==> Paquetes base"
 apt-get update -qq
